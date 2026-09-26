@@ -378,3 +378,289 @@ where Datediff(visited_on, (select min(visited_on) from customer)) >= 6
 -- if the date difference is greather than equal to 6 then show them
 ```
 ---
+# 602. Friend Requests II: Who Has the Most Friends
+
+**Difficulty:** Medium  
+**Topic:** CTEs, Aggregation & Combined Query Sets (`UNION ALL`)
+
+---
+
+## Problem Statement
+
+Table: `RequestAccepted`
+
+| Column Name | Type |
+| :--- | :--- |
+| `requester_id` | int |
+| `accepter_id` | int |
+| `accept_date` | date |
+
+* `(requester_id, accepter_id)` is the primary key (combination of columns with unique values) for this table.
+* This table contains the ID of the user who sent the friend request, the ID of the user who accepted it, and the acceptance date.
+
+Write a solution to find the person who has the **most friends** and their total **number of friends**.
+
+The test cases are generated such that only one person has the most friends.
+
+---
+
+## Example
+
+### Input
+
+`RequestAccepted` table:
+
+| requester_id | accepter_id | accept_date |
+| :--- | :--- | :--- |
+| 1 | 2 | 2016/06/03 |
+| 1 | 3 | 2016/06/08 |
+| 2 | 3 | 2016/06/08 |
+| 3 | 4 | 2016/06/09 |
+
+### Output
+
+| id | num |
+| :--- | :--- |
+| 3 | 3 |
+
+### Explanation
+
+* **User 1:** Friends with `2` and `3` $\rightarrow$ 2 friends
+* **User 2:** Friends with `1` and `3` $\rightarrow$ 2 friends
+* **User 3:** Friends with `1`, `2`, and `4` $\rightarrow$ 3 friends
+* **User 4:** Friends with `3` $\rightarrow$ 1 friend
+
+User `3` has the most friends (3 friends total).
+
+---
+
+## Solution
+
+```sql
+-- separate the tables first request table with each id count and acceptable with each id count
+
+with rquestTable as (
+    select requester_id as id, count(*) as total from requestAccepted
+    group by requester_id
+),
+acceptTable as (
+    select accepter_id as id, count(*) as total from requestAccepted
+    group by accepter_id
+),
+-- merge both the table then we can count the total id wise
+fullTable as (
+    select * from rquestTable
+    union all
+    select * from acceptTable
+)
+
+select id, sum(total) as num from fullTable
+group by id
+order by num desc limit 1
+```
+---
+# 585. Investments in 2016
+
+**Difficulty:** Medium  
+**Topic:** Subqueries, Aggregation & Grouping (`HAVING`)
+
+---
+
+## Problem Statement
+
+Table: `Insurance`
+
+| Column Name | Type |
+| :--- | :--- |
+| `pid` | int |
+| `tiv_2015` | float |
+| `tiv_2016` | float |
+| `lat` | float |
+| `lon` | float |
+
+* `pid` is the primary key (column with unique values) for this table.
+* `tiv_2015` is the total investment value in 2015, and `tiv_2016` is the total investment value in 2016.
+* `(lat, lon)` represent the geographic latitude and longitude of the policyholder's city. Neither is `NULL`.
+
+Write a solution to report the sum of all total investment values in 2016 (`tiv_2016`) for all policyholders who meet **both** criteria:
+1. Have the same `tiv_2015` value as one or more other policyholders.
+2. Are located at a unique `(lat, lon)` pair (i.e., not located in the same city as any other policyholder).
+
+Round `tiv_2016` to **two decimal places**.
+
+---
+
+## Example
+
+### Input
+
+`Insurance` table:
+
+| pid | tiv_2015 | tiv_2016 | lat | lon |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | 10 | 5 | 10 | 10 |
+| 2 | 20 | 20 | 20 | 20 |
+| 3 | 10 | 30 | 20 | 20 |
+| 4 | 10 | 40 | 40 | 40 |
+
+### Output
+
+| tiv_2016 |
+| :--- |
+| 45.00 |
+
+### Explanation
+
+* **Policy 1 (`pid = 1`):** `tiv_2015` = 10 (shared with `pid` 3 & 4) and `(lat, lon)` = (10, 10) (unique location) $\rightarrow$ **Valid**
+* **Policy 2 (`pid = 2`):** `tiv_2015` = 20 (unique) and `(lat, lon)` = (20, 20) (shared with `pid` 3) $\rightarrow$ Invalid
+* **Policy 3 (`pid = 3`):** `tiv_2015` = 10 (shared), but `(lat, lon)` = (20, 20) (shared with `pid` 2) $\rightarrow$ Invalid
+* **Policy 4 (`pid = 4`):** `tiv_2015` = 10 (shared) and `(lat, lon)` = (40, 40) (unique location) $\rightarrow$ **Valid**
+
+Sum of `tiv_2016` for valid policies (1 & 4) = $5 + 40 = 45.00$.
+
+---
+
+## Solution
+
+```sql
+# Write your MySQL query statement below
+with tb as (
+    select * from insurance
+    -- first condition
+    where tiv_2015 in (
+        select tiv_2015 from insurance
+        group by tiv_2015 having count(*) > 1
+    )
+    -- second condition
+    and (lat, lon) in (
+        select lat, lon from insurance
+        group by lat, lon having count(*) = 1
+    )
+)
+
+select round( sum(tiv_2016), 2) as tiv_2016 from tb
+```
+---
+# 185. Department Top Three Salaries
+
+**Difficulty:** Hard  
+**Topic:** Window Functions (`DENSE_RANK`), Joins & CTEs
+
+---
+
+## Problem Statement
+
+Table: `Employee`
+
+| Column Name | Type |
+| :--- | :--- |
+| `id` | int |
+| `name` | varchar |
+| `salary` | int |
+| `departmentId` | int |
+
+* `id` is the primary key (column with unique values) for this table.
+* `departmentId` is a foreign key referencing the `Department` table.
+* Each row indicates the ID, name, salary, and department ID of an employee.
+
+Table: `Department`
+
+| Column Name | Type |
+| :--- | :--- |
+| `id` | int |
+| `name` | varchar |
+
+* `id` is the primary key (column with unique values) for this table.
+* Each row indicates the ID and name of a department.
+
+A **high earner** in a department is defined as an employee whose salary is in the **top three unique salaries** for that department.
+
+Write a solution to find all high earners in each department.
+
+Return the result table in **any order**.
+
+---
+
+## Example
+
+### Input
+
+`Employee` table:
+
+| id | name | salary | departmentId |
+| :--- | :--- | :--- | :--- |
+| 1 | Joe | 85000 | 1 |
+| 2 | Henry | 80000 | 2 |
+| 3 | Sam | 60000 | 2 |
+| 4 | Max | 90000 | 1 |
+| 5 | Janet | 69000 | 1 |
+| 6 | Randy | 85000 | 1 |
+| 7 | Will | 70000 | 1 |
+
+`Department` table:
+
+| id | name |
+| :--- | :--- |
+| 1 | IT |
+| 2 | Sales |
+
+### Output
+
+| Department | Employee | Salary |
+| :--- | :--- | :--- |
+| IT | Max | 90000 |
+| IT | Joe | 85000 |
+| IT | Randy | 85000 |
+| IT | Will | 70000 |
+| Sales | Henry | 80000 |
+| Sales | Sam | 60000 |
+
+### Explanation
+
+* **IT Department:**
+  * Highest salary: `90000` (Max) $\rightarrow$ Rank 1
+  * 2nd highest unique salary: `85000` (Joe & Randy) $\rightarrow$ Rank 2 (both included)
+  * 3rd highest unique salary: `70000` (Will) $\rightarrow$ Rank 3
+  * `69000` (Janet) $\rightarrow$ Rank 4 (excluded)
+* **Sales Department:**
+  * Highest salary: `80000` (Henry) $\rightarrow$ Rank 1
+  * 2nd highest salary: `60000` (Sam) $\rightarrow$ Rank 2
+
+---
+
+## Solution
+
+```sql
+# Write your MySQL query statement below
+with tb as (
+    select e.id, e.name, e.salary, e.departmentId, d.name as department from employee as e
+    left join department as d on e.departmentId = d.id
+)
+
+-- select id, name, department, salary,
+-- dense_rank() over (
+--     partition by department
+--     order by salary desc
+-- ) as salary_rank
+-- from tb
+
+-- **** check this code first before the bellow code ***
+
+
+-- *** where clasuse run first before select: so hwere if we use the innner thing just and use where clause then it will not find the salary_rank column ***
+
+select department, name as employee, salary from (
+
+select id, name, department, salary,
+-- rank() dense_rank() is used to rank the vaule check them first
+-- dense_rank() will give us unique rank value
+dense_rank() over (
+  -- we are paritioning the table based on department
+    partition by department
+    order by salary desc
+) as salary_rank
+from tb
+) as t
+where salary_rank <= 3
+```
+---
